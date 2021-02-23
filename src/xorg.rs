@@ -12,6 +12,7 @@ use x11rb::xcb_ffi::XCBConnection;
 
 use crate::{Menu, Config, UserInterface};
 use crate::draw::do_draw;
+use crate::config::Position;
 
 atom_manager! {
     pub AtomCollection: AtomCollectionCookie {
@@ -222,10 +223,16 @@ fn create_window<C>(
     (width, height): (u16, u16),
     depth: u8,
     visual_id: Visualid,
+    position: Position,
 ) -> Result<Window, ReplyOrIdError>
 where
     C: Connection,
 {
+    let y = match position {
+        Position::Top => 0,
+        Position::Bottom => screen.height_in_pixels - height
+    };
+
     let window = conn.generate_id()?;
     let colormap = conn.generate_id()?;
     conn.create_colormap(ColormapAlloc::NONE, colormap, screen.root, visual_id)?;
@@ -240,7 +247,7 @@ where
         window,
         screen.root,
         0,
-        0,
+        y as i16,
         width,
         height,
         0,
@@ -323,8 +330,8 @@ fn handle_text(menu: &mut Menu, key: Keycode) -> XorgUiAction {
     eprintln!("char to handle: {:?}", char);
 
     if char.is_some() {
-        let searchTerm = menu.get_search_term();
-        menu.search(format!("{}{}", searchTerm, char.unwrap()));
+        let search_term = menu.get_search_term();
+        menu.search(format!("{}{}", search_term, char.unwrap()));
         return XorgUiAction::Redraw;
     }
 
@@ -343,7 +350,7 @@ impl XorgUserInterface {
         // composite manager starting/stopping at runtime.
         let transparency = composite_manager_running(&conn, screen_num)?;
 
-        let window = create_window(&conn, &screen, &atoms, (width, height), depth, visualid)?;
+        let window = create_window(&conn, &screen, &atoms, (width, height), depth, visualid, config.position.clone())?;
 
         // Here comes all the interaction between cairo and x11rb:
         let mut visual = find_xcb_visualtype(&conn, visualid).unwrap();

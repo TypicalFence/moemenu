@@ -35,14 +35,14 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
 
         // draw background for selected item 
         if i == current_selection as usize {
-            set_color(cr, config.colors.font_selected_background);
+            set_color(cr, config.colors.selected_background);
             cr.move_to(position, 0.0);
             cr.rectangle(position - spacing/2.0, 0.0, text_extents.width + spacing, height);
             cr.fill();
         }
 
         if i == current_selection as usize {
-            set_color(cr, config.colors.font_selected);
+            set_color(cr, config.colors.selected_font);
         } else {
             set_color(cr, config.colors.font);
         }
@@ -58,3 +58,4 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
     cr.move_to(10.0, extents.height + (height - extents.height) / 2.0);
     cr.show_text(menu.get_search_term());
 }
+

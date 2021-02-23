@@ -1,0 +1,9 @@
+#position = "bottom"
+height = 50
+font_size = 3.0
+
+[colors]
+background = "#222222"
+font = "#bbbbbb"
+selected_background = "#005577"
+selected_font = "#eeeeee"

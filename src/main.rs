@@ -1,6 +1,9 @@
+extern crate x11rb;
 extern crate cairo;
 extern crate rgb;
-extern crate x11rb;
+extern crate xdg;
+extern crate toml;
+extern crate css_color_parser;
 
 mod draw;
 mod menu;

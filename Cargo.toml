@@ -11,6 +11,9 @@ pkg-config = "0.3.8"
 
 [dependencies]
 rgb = "0.8.25"
+xdg = "2.2.0"
+toml = "0.5.8"
+css-color-parser = "0.1.2"
 
 [dependencies.x11rb]
 version = "0.8.0"
