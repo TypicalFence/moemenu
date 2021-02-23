@@ -1,6 +1,5 @@
 use std::error::Error;
 use std::fmt;
-use std::os::raw::c_char;
 
 use x11rb::atom_manager;
 use x11rb::connection::Connection;
@@ -11,10 +10,8 @@ use x11rb::protocol::Event;
 use x11rb::wrapper::ConnectionExt;
 use x11rb::xcb_ffi::XCBConnection;
 
+use crate::{Menu, Config, UserInterface};
 use crate::draw::do_draw;
-use crate::Menu;
-use crate::UserInterface;
-use std::ptr::{null_mut};
 
 atom_manager! {
     pub AtomCollection: AtomCollectionCookie {
@@ -34,6 +31,7 @@ pub struct XorgUserInterface {
     window: Window,
     atoms: AtomCollection,
     surface: cairo::XCBSurface,
+    config: Config
 }
 
 enum XorgUiAction {
@@ -334,11 +332,11 @@ fn handle_text(menu: &mut Menu, key: Keycode) -> XorgUiAction {
 }
 
 impl XorgUserInterface {
-    pub fn new() -> Result<XorgUserInterface, Box<dyn std::error::Error>> {
+    pub fn new(config: Config) -> Result<XorgUserInterface, Box<dyn std::error::Error>> {
         let (conn, screen_num) = XCBConnection::connect(None)?;
         let screen = &conn.setup().roots[screen_num];
         let atoms = AtomCollection::new(&conn)?.reply()?;
-        let (mut width, mut height) = (screen.width_in_pixels, 50);
+        let (mut width, mut height) = (screen.width_in_pixels, config.height);
         let (depth, visualid) = choose_visual(&conn, screen_num)?;
 
         // Check if a composite manager is running. In a real application, we should also react to a
@@ -382,6 +380,7 @@ impl XorgUserInterface {
             width,
             height,
             transparency,
+            config,
         })
     }
 }
@@ -436,6 +435,7 @@ impl UserInterface for XorgUserInterface {
                     &cr,
                     (self.width as _, self.height as _),
                     self.transparency,
+                    &self.config,
                     &menu,
                 );
                 self.surface.flush();

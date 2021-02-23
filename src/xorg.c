@@ -17,7 +17,8 @@ int keycode_to_utf8(unsigned int keycode, char *buffer) {
   KeySym ignore;
   Status return_status;
   Xutf8LookupString(xic, &event, buffer, 32, &ignore, &return_status);
-
+  XCloseIC(xic);
+  XCloseIM(xim);
   XCloseDisplay(display);
   return return_status;
 }

@@ -5,11 +5,14 @@ extern crate x11rb;
 mod draw;
 mod menu;
 mod xorg;
+mod config;
 
-use std::{fs, io};
+use std::io;
 use std::io::{BufRead};
 use std::process::exit;
+
 pub use crate::menu::Menu;
+pub use crate::config::Config;
 use crate::xorg::XorgUserInterface;
 
 pub trait UserInterface {
@@ -29,9 +32,10 @@ fn read_stdin() -> Vec<String> {
 
 
 fn main() {
+    let config = Config::load();
     let input= read_stdin();
     let mut menu = Menu::new(input);
-    let mut ui = XorgUserInterface::new().unwrap();
+    let mut ui = XorgUserInterface::new(config).unwrap();
     match ui.run(&mut menu) {
         Ok(selection) => {
             println!("{}", selection);
