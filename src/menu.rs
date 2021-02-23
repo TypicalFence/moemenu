@@ -1,4 +1,3 @@
-
 /// Manages the whole state of the program
 pub struct Menu {
     input: Vec<String>,
@@ -9,12 +8,22 @@ pub struct Menu {
 
 impl Menu {
     pub fn new(input: Vec<String>) -> Self {
-        return Menu {search_term: String::from(""), input: input.clone(), items: input.clone(), selection: 0}
+        return Menu {
+            search_term: String::from(""),
+            input: input.clone(),
+            items: input.clone(),
+            selection: 0,
+        };
     }
 
     pub fn search(&mut self, search_term: String) -> &Vec<String> {
         self.selection = 0;
-        self.items = self.input.clone().into_iter().filter(|x| x.starts_with(&search_term)).collect();
+        self.items = self
+            .input
+            .clone()
+            .into_iter()
+            .filter(|x| x.starts_with(&search_term))
+            .collect();
         return &self.items;
     }
 
