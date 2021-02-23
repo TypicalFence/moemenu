@@ -39,6 +39,7 @@ pub struct XorgUserInterface {
 enum XorgUiAction {
     Redraw,
     Stop,
+    Select,
     None,
 }
 
@@ -48,6 +49,8 @@ mod XorgKeys {
     pub const ESC: Keycode = 9;
     pub const ENTER: Keycode = 36;
     pub const BACKSPACE: Keycode = 22;
+    pub const LEFT: Keycode = 114;
+    pub const RIGHT: Keycode = 113;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -100,6 +103,28 @@ impl fmt::Display for KeyboardGrabError {
 impl Error for KeyboardGrabError {
     fn description(&self) -> &str {
         &self.details
+    }
+}
+
+#[derive(Debug)]
+struct NoSelectionError {
+}
+
+impl NoSelectionError {
+    fn new() -> Self {
+        NoSelectionError {}
+    }
+}
+
+impl fmt::Display for NoSelectionError{
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "No selection as made.")
+    }
+}
+
+impl Error for NoSelectionError {
+    fn description(&self) -> &str {
+        "No selection as made."
     }
 }
 
@@ -264,15 +289,22 @@ where
 fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
     // response_type 2 => press
     // response_type 3 => release
-
     match event {
         KeyPressEvent {
-            response_type: 3,
+            response_type: 2,
             detail,
             ..
         } => match detail {
-            XorgKeys::ENTER => XorgUiAction::Stop,
+            XorgKeys::ENTER => XorgUiAction::Select,
             XorgKeys::ESC => XorgUiAction::Stop,
+            XorgKeys::LEFT => {
+                menu.select_next_item();
+                XorgUiAction::Redraw
+            },
+            XorgKeys::RIGHT =>  {
+                menu.select_previous_item();
+                XorgUiAction::Redraw
+            },
             XorgKeys::BACKSPACE => {
                 let mut search_term= menu.get_search_term().clone();
                 search_term.pop();
@@ -288,9 +320,9 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
 }
 
 fn handle_text(menu: &mut Menu, key: Keycode) -> XorgUiAction {
-    println!("key code: {}", key);
+    eprintln!("key code: {}", key);
     let char = sys::keycode_to_char(key);
-    println!("char to handle: {:?}", char);
+    eprintln!("char to handle: {:?}", char);
 
     if char.is_some() {
         let searchTerm = menu.get_search_term();
@@ -355,8 +387,7 @@ impl XorgUserInterface {
 }
 
 impl UserInterface for XorgUserInterface {
-    fn run(&mut self, menu: &mut Menu) -> Result<(), Box<dyn std::error::Error>> {
-        let mut stop = false;
+    fn run(&mut self, menu: &mut Menu) -> Result<String, Box<dyn std::error::Error>> {
         loop {
             self.connection.flush()?;
             let event = self.connection.wait_for_event()?;
@@ -373,14 +404,20 @@ impl UserInterface for XorgUserInterface {
                             && event.window == self.window
                             && data[0] == self.atoms.WM_DELETE_WINDOW
                         {
-                            println!("Window was asked to close");
-                            return Ok(());
+                            eprintln!("Window was asked to close");
+                            return Err(Box::from(NoSelectionError::new()));
                         }
                     }
                     Event::KeyPress(event) | Event::KeyRelease(event) => {
                         match handle_keyboard(event, menu) {
                             XorgUiAction::Stop => {
-                                stop = true;
+                                return Err(Box::from(NoSelectionError::new()));
+                            }
+                            XorgUiAction::Select => {
+                                return match menu.get_selected_item() {
+                                    Some(s) => Ok(s),
+                                    None => Err(Box::from(NoSelectionError::new()))
+                                }
                             }
                             XorgUiAction::Redraw => {
                                 need_redraw = true;
@@ -388,8 +425,8 @@ impl UserInterface for XorgUserInterface {
                             XorgUiAction::None => {}
                         };
                     }
-                    Event::Error(_) => println!("Got an unexpected error"),
-                    _ => println!("Got an unknown event"),
+                    Event::Error(_) => eprintln!("Got an unexpected error"),
+                    _ => eprintln!("Got an unknown event"),
                 }
                 event_option = self.connection.poll_for_event()?;
             }
@@ -402,9 +439,6 @@ impl UserInterface for XorgUserInterface {
                     &menu,
                 );
                 self.surface.flush();
-            }
-            if stop {
-                return Ok(());
             }
         }
     }

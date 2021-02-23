@@ -39,4 +39,23 @@ impl Menu {
     pub fn get_selection(&self) -> u32 {
         return self.selection;
     }
+
+    pub fn select_next_item(&mut self) {
+        if self.selection < self.items.len() as u32 {
+            self.selection += 1;
+        }
+    }
+
+    pub fn select_previous_item(&mut self) {
+        if self.selection > 0 {
+            self.selection -= 1;
+        }
+    }
+
+    pub fn get_selected_item(&self) -> Option<String> {
+        match self.items.get(self.selection as usize) {
+            Some(s) => Some(s.clone()),
+            None => None
+        }
+    }
 }
