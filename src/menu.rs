@@ -18,11 +18,12 @@ impl Menu {
 
     pub fn search(&mut self, search_term: String) -> &Vec<String> {
         self.selection = 0;
+        self.search_term = search_term;
         self.items = self
             .input
             .clone()
             .into_iter()
-            .filter(|x| x.starts_with(&search_term))
+            .filter(|x| x.starts_with(&self.search_term))
             .collect();
         return &self.items;
     }

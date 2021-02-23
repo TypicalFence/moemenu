@@ -5,9 +5,12 @@ authors = ["fence <fence@desu-mail.moe>"]
 edition = "2018"
 license = "GPL-3+"
 
+[build-dependencies]
+cc = "1.0"
+pkg-config = "0.3.8"
+
 [dependencies]
 rgb = "0.8.25"
-x11 = { version = "2.18.1", features = ["xlib"] }
 
 [dependencies.x11rb]
 version = "0.8.0"

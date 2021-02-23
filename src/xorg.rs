@@ -2,7 +2,6 @@ use std::error::Error;
 use std::fmt;
 use std::os::raw::c_char;
 
-use x11::xlib;
 use x11rb::atom_manager;
 use x11rb::connection::Connection;
 use x11rb::errors::{ReplyError, ReplyOrIdError};
@@ -15,11 +14,7 @@ use x11rb::xcb_ffi::XCBConnection;
 use crate::draw::do_draw;
 use crate::Menu;
 use crate::UserInterface;
-use std::ffi::CString;
-use std::ptr::{null, null_mut};
-
-// quite a lot of this was taken from the x11rb examples
-// it would be kinda cool the unsafe bits could be removed at some point
+use std::ptr::{null_mut};
 
 atom_manager! {
     pub AtomCollection: AtomCollectionCookie {
@@ -52,6 +47,7 @@ mod XorgKeys {
 
     pub const ESC: Keycode = 9;
     pub const ENTER: Keycode = 36;
+    pub const BACKSPACE: Keycode = 22;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -105,6 +101,30 @@ impl Error for KeyboardGrabError {
     fn description(&self) -> &str {
         &self.details
     }
+}
+
+// wrapper around xorg.c
+mod sys {
+    use std::os::raw::c_char;
+    use x11rb::protocol::xproto::Keycode;
+    use std::mem::take;
+
+    extern "C" {
+        fn keycode_to_utf8(keycode: u32, buffer: *mut c_char) -> i32;
+    }
+
+    pub fn keycode_to_char(keycode: Keycode) -> Option<char> {
+        let mut buffer: [c_char; 32] = [0; 32];
+        unsafe {
+            keycode_to_utf8(keycode as u32, buffer.as_mut_ptr());
+        }
+        // why does rust define c_char as i8 ???
+        let proper_bytes: Vec<u8> = buffer.to_vec().iter().map(|x| x.clone() as u8).collect();
+        let str = std::str::from_utf8(proper_bytes.as_slice()).unwrap();
+        let trimmed = str.trim_matches(char::from(0));
+        trimmed.chars().next()
+    }
+
 }
 
 /// Find a `xcb_visualtype_t` based on its ID number
@@ -197,7 +217,7 @@ where
         window,
         screen.root,
         0,
-        (screen.height_in_pixels - height) as i16,
+        0,
         width,
         height,
         0,
@@ -253,6 +273,12 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
         } => match detail {
             XorgKeys::ENTER => XorgUiAction::Stop,
             XorgKeys::ESC => XorgUiAction::Stop,
+            XorgKeys::BACKSPACE => {
+                let mut search_term= menu.get_search_term().clone();
+                search_term.pop();
+                menu.search(search_term);
+                XorgUiAction::Redraw
+            },
             key => handle_text(menu, key),
         },
         _ => {
@@ -262,58 +288,17 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
 }
 
 fn handle_text(menu: &mut Menu, key: Keycode) -> XorgUiAction {
-    //get_string_from_keycode(key);
-    XorgUiAction::None
-}
+    println!("key code: {}", key);
+    let char = sys::keycode_to_char(key);
+    println!("char to handle: {:?}", char);
 
-fn get_string_from_keycode(key: Keycode) {
-    // todo recreate in C and wrap that in rust
-    // the x11 bindings are unusable
-
-    unsafe {
-        let display = xlib::XOpenDisplay(null_mut());
-        let mut event = xlib::XKeyEvent {
-            type_: 3,
-            display,
-            state: 0,
-            keycode: key as u32,
-            // random garbage
-            // wish I could just do a partial struct
-            serial: 0,
-            send_event: 0,
-            window: 0,
-            root: 0,
-            subwindow: 0,
-            time: 0,
-            x: 0,
-            y: 0,
-            x_root: 0,
-            y_root: 0,
-            same_screen: 1,
-        };
-        let im = xlib::XOpenIM(
-            display,
-            xlib::XrmGetDatabase(display),
-            null_mut(),
-            null_mut(),
-        );
-        // nextline always segfaults because we can't pass in "optional" parameters that are needed
-        let ic = xlib::XCreateIC(im);
-        let mut buffer: [c_char; 32] = [0; 32];
-        let mut keysm: xlib::KeySym = 0;
-        let mut status: xlib::Status = 0;
-        let mut i_really_do_not_know: u64 = 32;
-        xlib::Xutf8LookupString(
-            ic,
-            &mut event as *mut xlib::XKeyEvent,
-            buffer.as_mut_ptr(),
-            //&i_really_do_not_know as *mut u64,
-            32,
-            &mut keysm as *mut u64,
-            &mut status as *mut i32,
-        );
-        println!("{:?}", buffer);
+    if char.is_some() {
+        let searchTerm = menu.get_search_term();
+        menu.search(format!("{}{}", searchTerm, char.unwrap()));
+        return XorgUiAction::Redraw;
     }
+
+    XorgUiAction::None
 }
 
 impl XorgUserInterface {

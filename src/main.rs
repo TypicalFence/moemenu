@@ -1,6 +1,5 @@
 extern crate cairo;
 extern crate rgb;
-extern crate x11;
 extern crate x11rb;
 
 mod draw;
