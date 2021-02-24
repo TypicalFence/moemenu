@@ -48,7 +48,7 @@ fn main() {
     match ui.run(&mut menu) {
         Ok(selection) => {
             println!("{}", selection);
-            exit(1);
+            exit(0);
         }
         Err(_) => {
             exit(1);

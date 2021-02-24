@@ -459,7 +459,7 @@ impl UserInterface for XorgUserInterface {
                             XorgUiAction::Select => {
                                 return match menu.get_selected_item() {
                                     Some(s) => Ok(s),
-                                    None => Err(Box::from(NoSelectionError::new()))
+                                    None => Ok(menu.get_search_term()) 
                                 }
                             }
                             XorgUiAction::Redraw => {

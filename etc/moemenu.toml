@@ -1,6 +1,6 @@
 #position = "bottom"
 height = 50
-font_size = 3.0
+font_size = 30.0
 
 [colors]
 background = "#222222"
