@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-full:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install deps
+      run: sudo apt install libx11-xcb-dev libx11-dev
+    - name: Build
+      run: cargo build --verbose --all-features
+
+  build-minimal:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Install deps
+      run: sudo apt install libx11-xcb-dev libx11-dev
+    - name: Build
+      run: cargo build --verbose --no-default-features
