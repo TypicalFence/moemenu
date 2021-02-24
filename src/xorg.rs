@@ -26,7 +26,6 @@ atom_manager! {
 
 pub struct XorgUserInterface {
     connection: XCBConnection,
-    screen: usize,
     width: u16,
     height: u16,
     transparency: bool,
@@ -43,6 +42,7 @@ enum XorgUiAction {
     None,
 }
 
+#[allow(non_snake_case)]
 mod XorgKeys {
     use x11rb::protocol::xproto::Keycode;
 
@@ -361,7 +361,7 @@ impl XorgUserInterface {
         let (conn, screen_num) = XCBConnection::connect(None)?;
         let screen = &conn.setup().roots[screen_num];
         let atoms = AtomCollection::new(&conn)?.reply()?;
-        let (mut width, mut height) = (screen.width_in_pixels, config.height);
+        let (width, height) = (screen.width_in_pixels, config.height);
         let (depth, visualid) = choose_visual(&conn, screen_num)?;
 
         // Check if a composite manager is running. In a real application, we should also react to a
@@ -396,14 +396,15 @@ impl XorgUserInterface {
         // remove flicker by painting the window in the background color
         // not ideal but works
         let cr = cairo::Context::new(&surface);
+        if transparency {
+            cr.set_operator(cairo::Operator::Source);
+        }
         set_color(&cr, config.colors.background);
-        cr.set_operator(cairo::Operator::Source);
         cr.paint();
 
         Ok(XorgUserInterface {
             connection: conn,
             window,
-            screen: screen_num,
             surface,
             atoms,
             width,

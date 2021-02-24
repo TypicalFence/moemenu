@@ -27,8 +27,8 @@ impl Menu {
         return &self.items;
     }
 
-    pub fn get_search_term(&self) -> &String {
-        return &self.search_term;
+    pub fn get_search_term(&self) -> String {
+        return self.search_term.clone();
     }
 
     pub fn get_items(&self) -> &Vec<String> {

@@ -1,5 +1,5 @@
 use crate::{Menu, Config};
-use rgb::{RGB, RGB8};
+use rgb::{RGB8};
 
 pub fn set_color(cr: &cairo::Context, rgb: RGB8) {
     let convert = |x| 1.0 / 255.0 * (x as f64);
@@ -8,10 +8,16 @@ pub fn set_color(cr: &cairo::Context, rgb: RGB8) {
 
 pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: bool, config: &Config, menu: &Menu) {
     // draw bar
+    if transparency {
+        cr.set_operator(cairo::Operator::Source);
+    }
     set_color(cr, config.colors.background);
-    cr.set_operator(cairo::Operator::Source);
     cr.paint();
-    cr.set_operator(cairo::Operator::Over);
+
+
+    if transparency {
+        cr.set_operator(cairo::Operator::Over);
+    }
 
     // print items
     set_color(cr, config.colors.font);
@@ -49,8 +55,9 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
     }
 
     // print search_term
-    let extents = cr.text_extents(menu.get_search_term());
+    let term = menu.get_search_term();
+    let extents = cr.text_extents(&term);
     cr.move_to(10.0, extents.height + (height - extents.height) / 2.0);
-    cr.show_text(menu.get_search_term());
+    cr.show_text(&term);
 }
 
