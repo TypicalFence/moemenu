@@ -1,11 +1,6 @@
 use crate::{Menu, Config};
 use rgb::{RGB, RGB8};
 
-const pink: RGB8 = RGB::new(247, 168, 184);
-const red: RGB8 = RGB::new(255, 0, 0);
-const black: RGB8 = RGB::new(0, 0, 0);
-const white: RGB8 = RGB::new(255, 255, 255);
-
 fn set_color(cr: &cairo::Context, rgb: RGB8) {
     let convert = |x| 1.0 / 255.0 * (x as f64);
     cr.set_source_rgb(convert(rgb.r), convert(rgb.g), convert(rgb.b));
