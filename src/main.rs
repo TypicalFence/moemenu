@@ -15,18 +15,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-extern crate x11rb;
-extern crate cairo;
-extern crate rgb;
-extern crate xdg;
-extern crate toml;
-extern crate css_color_parser;
-
 mod draw;
 mod menu;
 mod search;
 mod xorg;
 mod config;
+mod defaults;
 
 use std::io;
 use std::io::{BufRead};
@@ -56,9 +50,8 @@ fn read_stdin() -> Vec<String> {
     return input;
 }
 
-
 fn main() {
-    let config = Config::load();
+    let config = Config::get();
     let input= read_stdin();
     let mut menu = Menu::new(Box::from(ContainsEngine::new()), input);
     let mut ui = XorgUserInterface::new(config).unwrap();

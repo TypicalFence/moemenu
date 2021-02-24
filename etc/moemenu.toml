@@ -1,8 +1,10 @@
-#position = "bottom"
+position = "top" # "top" or "bottom"
 height = 50
 font_size = 30.0
 
 [colors]
+# most css syntax for colors should be supported
+# currently no alpha channel WIP
 background = "#222222"
 font = "#bbbbbb"
 selected_background = "#005577"
