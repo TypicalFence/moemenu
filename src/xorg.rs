@@ -129,24 +129,37 @@ impl Error for NoSelectionError {
 }
 
 // wrapper around xorg.c
+#[allow(non_upper_case_globals)]
 mod sys {
     use std::os::raw::c_char;
     use x11rb::protocol::xproto::Keycode;
+    
+    //const XBufferOverflow: i8 = -1;
+    //const XLookupNone: i8 = 1;
+    const XLookupChars: i32 = 2;
+    //const XLookupKeySym: i8 = 3;
+    const XLookupBoth: i32 = 4;
 
     extern "C" {
-        fn keycode_to_utf8(keycode: u32, buffer: *mut c_char) -> i32;
+        fn keycode_to_utf8(keycode: u32, mask: u32, buffer: *mut c_char) -> i32;
     }
 
-    pub fn keycode_to_char(keycode: Keycode) -> Option<char> {
+    pub fn keycode_to_char(keycode: Keycode, state: u16) -> Option<char> {
         let mut buffer: [c_char; 32] = [0; 32];
-        unsafe {
-            keycode_to_utf8(keycode as u32, buffer.as_mut_ptr());
+        let status: i32 = unsafe {
+            keycode_to_utf8(keycode as u32, state as u32, buffer.as_mut_ptr())
+        };
+        
+        // if we recieved bytes try converting them into a char
+        if status == XLookupChars || status == XLookupBoth {
+            // why does rust define c_char as i8 ???
+            let proper_bytes: Vec<u8> = buffer.to_vec().iter().map(|x| x.clone() as u8).collect();
+            let str = std::str::from_utf8(proper_bytes.as_slice()).unwrap();
+            let trimmed = str.trim_matches(char::from(0));
+            return trimmed.chars().next()
         }
-        // why does rust define c_char as i8 ???
-        let proper_bytes: Vec<u8> = buffer.to_vec().iter().map(|x| x.clone() as u8).collect();
-        let str = std::str::from_utf8(proper_bytes.as_slice()).unwrap();
-        let trimmed = str.trim_matches(char::from(0));
-        trimmed.chars().next()
+        
+        None
     }
 
 }
@@ -298,6 +311,7 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
         KeyPressEvent {
             response_type: 2,
             detail,
+            state,
             ..
         } => match detail {
             XorgKeys::ENTER => XorgUiAction::Select,
@@ -316,7 +330,7 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
                 menu.search(search_term);
                 XorgUiAction::Redraw
             },
-            key => handle_text(menu, key),
+            key => handle_text(menu, key, state),
         },
         _ => {
             return XorgUiAction::None;
@@ -324,9 +338,9 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
     }
 }
 
-fn handle_text(menu: &mut Menu, key: Keycode) -> XorgUiAction {
+fn handle_text(menu: &mut Menu, key: Keycode, mask: u16) -> XorgUiAction {
     eprintln!("key code: {}", key);
-    let char = sys::keycode_to_char(key);
+    let char = sys::keycode_to_char(key, mask);
     eprintln!("char to handle: {:?}", char);
 
     if char.is_some() {

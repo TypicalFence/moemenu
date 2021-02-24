@@ -1,6 +1,6 @@
 #include <X11/Xlib.h>
 
-int keycode_to_utf8(unsigned int keycode, char *buffer) {
+int keycode_to_utf8(unsigned int keycode, unsigned int mask, char *buffer) {
   Display* display = XOpenDisplay(":0");
 
   XIM xim = XOpenIM(display, 0, 0, 0);
@@ -9,7 +9,7 @@ int keycode_to_utf8(unsigned int keycode, char *buffer) {
   XKeyPressedEvent event;
   event.type = KeyPress;
   event.display = display;
-  event.state = 0;
+  event.state = mask;
   event.keycode = keycode;
 
   KeySym ignore;
