@@ -74,7 +74,7 @@ impl Config {
     fn handle_toml(toml: Value) -> Self {
         let default= Self::default();
         let position = get_str(&toml, "position");
-        let font_size = get_float(&toml, "fon_size");
+        let font_size = get_float(&toml, "font_size");
         let height = get_int(&toml, "height");
         let colors = toml.get("colors");
 
