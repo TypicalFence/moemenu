@@ -1,7 +1,7 @@
 use crate::{Menu, Config};
 use rgb::{RGB, RGB8};
 
-fn set_color(cr: &cairo::Context, rgb: RGB8) {
+pub fn set_color(cr: &cairo::Context, rgb: RGB8) {
     let convert = |x| 1.0 / 255.0 * (x as f64);
     cr.set_source_rgb(convert(rgb.r), convert(rgb.g), convert(rgb.b));
 }

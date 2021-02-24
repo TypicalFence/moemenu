@@ -11,7 +11,7 @@ use x11rb::wrapper::ConnectionExt;
 use x11rb::xcb_ffi::XCBConnection;
 
 use crate::{Menu, Config, UserInterface};
-use crate::draw::do_draw;
+use crate::draw::{do_draw, set_color};
 use crate::config::Position;
 
 atom_manager! {
@@ -341,7 +341,7 @@ fn handle_text(menu: &mut Menu, key: Keycode) -> XorgUiAction {
 fn grab_keyboard(conn: &XCBConnection, screen: &Screen) -> Result<(), KeyboardGrabError> {
     let wait_time = time::Duration::from_millis(10);
     let root = screen.root;
-    for _ in 1..=1000 {
+    for _ in 1..=100 {
         let cookie = conn
             .grab_keyboard(true, root, 0 as u32, GrabMode::ASYNC, GrabMode::ASYNC)
             .unwrap();
@@ -368,6 +368,13 @@ impl XorgUserInterface {
         // composite manager starting/stopping at runtime.
         let transparency = composite_manager_running(&conn, screen_num)?;
 
+        // grab keyboard
+        let grab_result = grab_keyboard(&conn, &screen);
+
+        if grab_result.is_err() {
+            return Err(Box::from(grab_result.err().unwrap()))
+        }
+
         let window = create_window(&conn, &screen, &atoms, (width, height), depth, visualid, config.position.clone())?;
 
         // Here comes all the interaction between cairo and x11rb:
@@ -386,12 +393,12 @@ impl XorgUserInterface {
         )
         .unwrap();
 
-        // grab keyboard
-        let grab_result = grab_keyboard(&conn, &screen);
-
-        if grab_result.is_err() {
-            return Err(Box::from(grab_result.err().unwrap()))
-        }
+        // remove flicker by painting the window in the background color
+        // not ideal but works
+        let cr = cairo::Context::new(&surface);
+        set_color(&cr, config.colors.background);
+        cr.set_operator(cairo::Operator::Source);
+        cr.paint();
 
         Ok(XorgUserInterface {
             connection: conn,
