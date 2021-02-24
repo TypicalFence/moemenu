@@ -1,5 +1,5 @@
 use std::error::Error;
-use std::fmt;
+use std::{fmt, thread, time};
 
 use x11rb::atom_manager;
 use x11rb::connection::Connection;
@@ -20,6 +20,7 @@ atom_manager! {
         WM_DELETE_WINDOW,
         _NET_WM_NAME,
         UTF8_STRING,
+
     }
 }
 
@@ -131,7 +132,6 @@ impl Error for NoSelectionError {
 mod sys {
     use std::os::raw::c_char;
     use x11rb::protocol::xproto::Keycode;
-    use std::mem::take;
 
     extern "C" {
         fn keycode_to_utf8(keycode: u32, buffer: *mut c_char) -> i32;
@@ -338,6 +338,24 @@ fn handle_text(menu: &mut Menu, key: Keycode) -> XorgUiAction {
     XorgUiAction::None
 }
 
+fn grab_keyboard(conn: &XCBConnection, screen: &Screen) -> Result<(), KeyboardGrabError> {
+    let wait_time = time::Duration::from_millis(10);
+    let root = screen.root;
+    for _ in 1..=1000 {
+        let cookie = conn
+            .grab_keyboard(true, root, 0 as u32, GrabMode::ASYNC, GrabMode::ASYNC)
+            .unwrap();
+
+        if cookie.reply().unwrap().status == GrabStatus::SUCCESS {
+            return Ok(());
+        }
+        
+        thread::sleep(wait_time);
+    }
+
+    Err(KeyboardGrabError::new("failed grab keyboard"))
+}
+
 impl XorgUserInterface {
     pub fn new(config: Config) -> Result<XorgUserInterface, Box<dyn std::error::Error>> {
         let (conn, screen_num) = XCBConnection::connect(None)?;
@@ -369,13 +387,10 @@ impl XorgUserInterface {
         .unwrap();
 
         // grab keyboard
-        let root = screen.root;
-        let cookie = conn
-            .grab_keyboard(true, root, 0 as u32, GrabMode::ASYNC, GrabMode::ASYNC)
-            .unwrap();
+        let grab_result = grab_keyboard(&conn, &screen);
 
-        if cookie.reply().unwrap().status != GrabStatus::SUCCESS {
-            return Err(Box::from(KeyboardGrabError::new("failed grab keyboard")));
+        if grab_result.is_err() {
+            return Err(Box::from(grab_result.err().unwrap()))
         }
 
         Ok(XorgUserInterface {
