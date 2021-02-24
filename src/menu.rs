@@ -23,6 +23,7 @@ pub struct Menu {
     search_term: String,
     items: Vec<String>,
     selection: u32,
+    shift: u32,
     engine: Box<dyn SearchEngine>,
 }
 
@@ -33,12 +34,14 @@ impl Menu {
             input: input.clone(),
             items: input.clone(),
             selection: 0,
+            shift: 0,
             engine
         };
     }
 
     pub fn search(&mut self, search_term: String) -> &Vec<String> {
         self.selection = 0;
+        self.shift = 0;
         self.search_term = search_term;
         self.items = self.engine.search(&self.search_term, &self.input);
         return &self.items;
@@ -57,7 +60,7 @@ impl Menu {
     }
 
     pub fn select_next_item(&mut self) {
-        if self.selection < self.items.len() as u32 {
+        if self.selection < self.items.len()  as u32 - 1 {
             self.selection += 1;
         }
     }
@@ -73,6 +76,25 @@ impl Menu {
             Some(s) => Some(s.clone()),
             None => None
         }
+    }
+
+    pub fn get_shift(&self) -> u32 {
+        return self.shift
+    }
+
+    pub fn update_page(&mut self, last_first_item: u32, current_last_item: u32) -> bool {
+        if self.selection > current_last_item {
+            self.shift = current_last_item + 1;
+            return true;
+        }
+
+        // selection smaller than the current start
+        if self.selection < self.shift {
+            self.shift = last_first_item;
+            return true;
+        }
+
+        false
     }
 }
 

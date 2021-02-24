@@ -27,7 +27,7 @@ use x11rb::protocol::Event;
 use x11rb::wrapper::ConnectionExt;
 use x11rb::xcb_ffi::XCBConnection;
 
-use crate::{Menu, Config, UserInterface};
+use crate::{Menu, Config, UserInterface, draw};
 use crate::draw::{do_draw, set_color};
 use crate::config::Position;
 
@@ -66,8 +66,8 @@ mod XorgKeys {
     pub const ESC: Keycode = 9;
     pub const ENTER: Keycode = 36;
     pub const BACKSPACE: Keycode = 22;
-    pub const LEFT: Keycode = 114;
-    pub const RIGHT: Keycode = 113;
+    pub const LEFT: Keycode = 113;
+    pub const RIGHT: Keycode = 114;
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -334,11 +334,11 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
             XorgKeys::ENTER => XorgUiAction::Select,
             XorgKeys::ESC => XorgUiAction::Stop,
             XorgKeys::LEFT => {
-                menu.select_next_item();
+                menu.select_previous_item();
                 XorgUiAction::Redraw
             },
             XorgKeys::RIGHT =>  {
-                menu.select_previous_item();
+                menu.select_next_item();
                 XorgUiAction::Redraw
             },
             XorgKeys::BACKSPACE => {
@@ -448,6 +448,7 @@ impl XorgUserInterface {
 
 impl UserInterface for XorgUserInterface {
     fn run(&mut self, menu: &mut Menu) -> Result<String, Box<dyn std::error::Error>> {
+        let cr = cairo::Context::new(&self.surface);
         loop {
             self.connection.flush()?;
             let event = self.connection.wait_for_event()?;
@@ -490,9 +491,16 @@ impl UserInterface for XorgUserInterface {
                 }
                 event_option = self.connection.poll_for_event()?;
             }
+
+            // ensure selection does not go of screen
+            let items = menu.get_items();
+            let last_item = draw::find_last_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, items);
+            let first_item = draw::find_first_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, items);
+            menu.update_page(first_item as u32, last_item as u32);
+
+
             if need_redraw {
-                let cr = cairo::Context::new(&self.surface);
-                do_draw(
+                let last_item = do_draw(
                     &cr,
                     (self.width as _, self.height as _),
                     self.transparency,

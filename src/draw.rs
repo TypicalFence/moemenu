@@ -23,6 +23,66 @@ pub fn set_color(cr: &cairo::Context, rgb: RGB8) {
     cr.set_source_rgb(convert(rgb.r), convert(rgb.g), convert(rgb.b));
 }
 
+const END_BUFFER: f64 = 250.0;
+const SPACING: f64 = 50.0;
+const START_DIVISOR: f64 = 6.0;
+
+pub fn find_last_item_that_fits(cr: &cairo::Context, width: f64, start: usize, items: &Vec<String>) -> usize {
+    let mut position: f64 = width / START_DIVISOR;
+
+    for (i, item) in items.clone().iter().enumerate() {
+        // is the item to the left of the starting point?
+        if i < start {
+            continue;
+        }
+
+        let text_extents = cr.text_extents(item);
+        let next_width = match items.get(i + 1) {
+            Some(word) => cr.text_extents(word).width,
+            None => 0.0
+        };
+        let next_is_off_screen = position + text_extents.width + next_width + 2.0 * SPACING > width - END_BUFFER;
+
+        if next_is_off_screen {
+            return i;
+        }
+
+
+        position += text_extents.width + SPACING;
+    }
+
+    items.len()
+}
+
+pub fn find_first_item_that_fits(cr: &cairo::Context, width: f64, end: usize, items: &Vec<String>) -> usize {
+    let start: f64 = width / START_DIVISOR;
+    let mut position: f64 = width - END_BUFFER;
+    let len = items.len();
+
+    for i in (0..len).rev() {
+        // is the item to the left of the starting point?
+        if i > end {
+            continue;
+        }
+
+        let item = items.get(i).unwrap();
+        let text_extents = cr.text_extents(item);
+        let previous_width = match items.get((i + len - 1) % len) {
+            Some(word) => cr.text_extents(word).width,
+            None => 0.0
+        };
+        let prev_is_off_screen = position - text_extents.width - previous_width - 2.0 * SPACING < start;
+
+        if prev_is_off_screen {
+            return i;
+        }
+
+        position -= text_extents.width - SPACING;
+    }
+
+    0
+}
+
 pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: bool, config: &Config, menu: &Menu) {
     // draw bar
     if transparency {
@@ -41,17 +101,21 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
     cr.set_font_size(config.font_size);
     let font_extents = cr.font_extents();
 
-    let mut position: f64 = width / 6.0;
-    let spacing = 50.0;
+    let start: f64 = width / START_DIVISOR;
+    let mut position: f64 = start;
+    let spacing = SPACING;
     let current_selection = menu.get_selection();
-    for (i, item )in menu.get_items().iter().enumerate() {
-        if position > width {
-            break;
+
+    let items = menu.get_items();
+    for (i, item ) in items.clone().iter().enumerate() {
+        // don't draw elements that have been scrolled away
+        if i < menu.get_shift() as usize {
+            continue;
         }
 
         let text_extents = cr.text_extents(item);
 
-        // draw background for selected item 
+        // draw background for selected item
         if i == current_selection as usize {
             set_color(cr, config.colors.selected_background);
             cr.move_to(position, 0.0);
@@ -65,9 +129,23 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
             set_color(cr, config.colors.font);
         }
 
+        let next_width = match items.get(i + 1) {
+            Some(word) => cr.text_extents(word).width,
+            None => 0.0
+        };
+        let next_is_off_screen = position + text_extents.width + next_width + 2.0 * spacing > width - END_BUFFER;
+
+        if next_is_off_screen {
+            set_color(cr, RGB8::new(255, 0, 0));
+        }
         let y_pos = height/2.0 + config.font_size/2.0 - font_extents.descent * 0.7; // 0.7 for good measure
         cr.move_to(position, y_pos);
         cr.show_text(item);
+
+        if next_is_off_screen {
+            break;
+        }
+
         position += text_extents.width + spacing;
     }
 
