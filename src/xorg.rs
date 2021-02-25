@@ -356,9 +356,7 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
 }
 
 fn handle_text(menu: &mut Menu, key: Keycode, mask: u16) -> XorgUiAction {
-    eprintln!("key code: {}", key);
     let char = sys::keycode_to_char(key, mask);
-    eprintln!("char to handle: {:?}", char);
 
     if char.is_some() {
         let search_term = menu.get_search_term();
@@ -488,7 +486,7 @@ impl UserInterface for XorgUserInterface {
                         };
                     }
                     Event::Error(_) => eprintln!("Got an unexpected error"),
-                    _ => eprintln!("Got an unknown event"),
+                    e => eprintln!("Got an unknown event: {:?}", e),
                 }
                 event_option = self.connection.poll_for_event()?;
             }
@@ -497,11 +495,11 @@ impl UserInterface for XorgUserInterface {
             let items = menu.get_items();
             let last_item = draw::find_last_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, items);
             let first_item = draw::find_first_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, items);
-            menu.update_page(first_item as u32, last_item as u32);
+            menu.update_page(first_item, last_item);
 
 
             if need_redraw {
-                let last_item = do_draw(
+                do_draw(
                     &cr,
                     (self.width as _, self.height as _),
                     self.transparency,

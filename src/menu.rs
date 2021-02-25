@@ -22,8 +22,8 @@ pub struct Menu {
     input: Vec<String>,
     search_term: String,
     items: Vec<String>,
-    selection: u32,
-    shift: u32,
+    selection: usize,
+    shift: usize,
     engine: Box<dyn SearchEngine>,
 }
 
@@ -55,12 +55,12 @@ impl Menu {
         return &self.items;
     }
 
-    pub fn get_selection(&self) -> u32 {
+    pub fn get_selection(&self) -> usize {
         return self.selection;
     }
 
     pub fn select_next_item(&mut self) {
-        if self.selection < self.items.len()  as u32 - 1 {
+        if self.selection < self.items.len() - 1 {
             self.selection += 1;
         }
     }
@@ -78,19 +78,19 @@ impl Menu {
         }
     }
 
-    pub fn get_shift(&self) -> u32 {
-        return self.shift
+    pub fn get_shift(&self) -> usize {
+        return self.shift;
     }
 
-    pub fn update_page(&mut self, last_first_item: u32, current_last_item: u32) -> bool {
+    pub fn update_page(&mut self, last_first_item: usize, current_last_item: usize) -> bool {
         if self.selection > current_last_item {
-            self.shift = current_last_item + 1;
+            self.shift = current_last_item as usize + 1;
             return true;
         }
 
         // selection smaller than the current start
         if self.selection < self.shift {
-            self.shift = last_first_item;
+            self.shift = last_first_item as usize;
             return true;
         }
 

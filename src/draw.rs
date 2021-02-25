@@ -156,10 +156,13 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
 
         position += text_extents.width + spacing;
     }
-    let next_page_indicator= ">";
-    let npi_extents = cr.text_extents(next_page_indicator);
-    cr.move_to(width - END_BUFFER, npi_extents.height + (height - npi_extents.height) / 2.0);
-    cr.show_text(next_page_indicator);
+
+    if has_next_page {
+        let next_page_indicator = ">";
+        let npi_extents = cr.text_extents(next_page_indicator);
+        cr.move_to(width - END_BUFFER, npi_extents.height + (height - npi_extents.height) / 2.0);
+        cr.show_text(next_page_indicator);
+    }
 
     // print search_term
     let term = menu.get_search_term();
