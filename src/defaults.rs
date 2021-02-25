@@ -24,12 +24,12 @@ const WHITE: RGB8 = RGB8::new(255, 255, 255);
 
 pub const DEFAULT_CONFIG: Config = Config {
     position: Position::Top,
-    font_size: 30.0,
-    height: 50,
+    font_size: 13.0,
+    height: 26,
     colors: Colors {
         background: PINK,
         font: BLACK,
-        selected_font: PINK,
+        selected_font: BLACK,
         selected_background: WHITE,
     }
 };

@@ -1,6 +1,6 @@
 position = "top" # "top" or "bottom"
-height = 50
-font_size = 30.0
+height = 26 
+font_size = 13.0
 
 [colors]
 # most css syntax for colors should be supported
