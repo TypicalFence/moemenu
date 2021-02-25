@@ -23,12 +23,14 @@ pub fn set_color(cr: &cairo::Context, rgb: RGB8) {
     cr.set_source_rgb(convert(rgb.r), convert(rgb.g), convert(rgb.b));
 }
 
-const END_BUFFER: f64 = 250.0;
+// TODO put in config
+const END_BUFFER: f64 = 100.0;
 const SPACING: f64 = 50.0;
 const START_DIVISOR: f64 = 6.0;
 
 pub fn find_last_item_that_fits(cr: &cairo::Context, width: f64, start: usize, items: &Vec<String>) -> usize {
     let mut position: f64 = width / START_DIVISOR;
+
 
     for (i, item) in items.clone().iter().enumerate() {
         // is the item to the left of the starting point?
@@ -91,7 +93,6 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
     set_color(cr, config.colors.background);
     cr.paint();
 
-
     if transparency {
         cr.set_operator(cairo::Operator::Over);
     }
@@ -106,7 +107,16 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
     let spacing = SPACING;
     let current_selection = menu.get_selection();
 
+    // has previous page
+    if menu.get_shift() > 0 {
+        let prev_page_indicator = "<";
+        let ppi_extents = cr.text_extents(prev_page_indicator);
+        cr.move_to(start - ppi_extents.width - spacing, ppi_extents.height + (height - ppi_extents.height) / 2.0);
+        cr.show_text(prev_page_indicator);
+    }
+
     let items = menu.get_items();
+    let mut has_next_page = false;
     for (i, item ) in items.clone().iter().enumerate() {
         // don't draw elements that have been scrolled away
         if i < menu.get_shift() as usize {
@@ -135,24 +145,26 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
         };
         let next_is_off_screen = position + text_extents.width + next_width + 2.0 * spacing > width - END_BUFFER;
 
-        if next_is_off_screen {
-            set_color(cr, RGB8::new(255, 0, 0));
-        }
         let y_pos = height/2.0 + config.font_size/2.0 - font_extents.descent * 0.7; // 0.7 for good measure
         cr.move_to(position, y_pos);
         cr.show_text(item);
 
         if next_is_off_screen {
+            has_next_page = true;
             break;
         }
 
         position += text_extents.width + spacing;
     }
+    let next_page_indicator= ">";
+    let npi_extents = cr.text_extents(next_page_indicator);
+    cr.move_to(width - END_BUFFER, npi_extents.height + (height - npi_extents.height) / 2.0);
+    cr.show_text(next_page_indicator);
 
     // print search_term
     let term = menu.get_search_term();
-    let extents = cr.text_extents(&term);
-    cr.move_to(10.0, extents.height + (height - extents.height) / 2.0);
+    let term_extents = cr.text_extents(&term);
+    cr.move_to(10.0, term_extents.height + (height - term_extents.height) / 2.0);
     cr.show_text(&term);
 }
 
