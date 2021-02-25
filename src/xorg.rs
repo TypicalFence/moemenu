@@ -432,6 +432,7 @@ impl XorgUserInterface {
         }
         set_color(&cr, config.colors.background);
         cr.paint();
+        conn.flush()?;
 
         Ok(XorgUserInterface {
             connection: conn,
