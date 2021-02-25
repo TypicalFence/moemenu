@@ -15,7 +15,7 @@ cc = "1.0"
 pkg-config = "0.3.8"
 
 [dependencies]
-x11rb = { version = "0.8.0", features = ["allow-unsafe-code", "render"] }
+x11rb = { version = "0.8.0", features = ["allow-unsafe-code", "render", "xinerama"] }
 cairo-rs = { version = "0.9", features = ["xcb"] }
 rgb = "0.8.25"
 xdg = { version = "2.2.0", optional = true }

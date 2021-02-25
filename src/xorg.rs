@@ -22,6 +22,7 @@ use x11rb::atom_manager;
 use x11rb::connection::Connection;
 use x11rb::errors::{ReplyError, ReplyOrIdError};
 use x11rb::protocol::render::{self, ConnectionExt as _, PictType};
+use x11rb::protocol::xinerama::{self, ConnectionExt as _, *};
 use x11rb::protocol::xproto::{ConnectionExt as _, *};
 use x11rb::protocol::Event;
 use x11rb::wrapper::ConnectionExt;
@@ -30,6 +31,7 @@ use x11rb::xcb_ffi::XCBConnection;
 use crate::{Menu, Config, UserInterface, draw};
 use crate::draw::{do_draw, set_color};
 use crate::config::Position;
+use std::convert::TryInto;
 
 atom_manager! {
     pub AtomCollection: AtomCollectionCookie {
@@ -37,7 +39,6 @@ atom_manager! {
         WM_DELETE_WINDOW,
         _NET_WM_NAME,
         UTF8_STRING,
-
     }
 }
 
@@ -167,7 +168,7 @@ mod sys {
             keycode_to_utf8(keycode as u32, state as u32, buffer.as_mut_ptr())
         };
         
-        // if we recieved bytes try converting them into a char
+        // if we received bytes try converting them into a char
         if status == XLookupChars || status == XLookupBoth {
             // why does rust define c_char as i8 ???
             let proper_bytes: Vec<u8> = buffer.to_vec().iter().map(|x| x.clone() as u8).collect();
@@ -246,6 +247,87 @@ fn composite_manager_running(
     Ok(owner.owner != x11rb::NONE)
 }
 
+/// returns the position and size of the focused monitor
+fn handle_multi_monitor<C>(conn: &C) -> Option<(i16, i16, u16, u16)> where
+    C: Connection,
+{
+    // TODO streamline
+    let get_screen_info = |conn: &C| -> Option<QueryScreensReply> {
+        if let Ok(cookie) = conn.xinerama_query_screens() {
+            if let Ok(reply) = cookie.reply() {
+                return Some(reply);
+            }
+        };
+        None
+    };
+    let get_focused_window = |conn: &C| -> Option<Window> {
+        if let Ok(cookie) = conn.get_input_focus() {
+            if let Ok(reply) = cookie.reply() {
+                return Some(reply.focus);
+            }
+        }
+        None
+    };
+    let get_geometry= |conn: &C, w| -> Option<GetGeometryReply> {
+        if let Ok(cookie) = conn.get_geometry(w) {
+            if let Ok(reply) = cookie.reply() {
+                return Some(reply);
+            }
+        }
+        None
+    };
+    let get_window_tree = |conn: &C, w| {
+        if let Ok(cookie) = conn.query_tree(w) {
+            if let Ok(reply) = cookie.reply() {
+                return Some(reply);
+            }
+        }
+        None
+    };
+    let translate_coordinates = |conn: &C, src, dst| {
+        if let Some(geo) = get_geometry(conn, src) {
+            if let Ok(cookie) = conn.translate_coordinates(src, dst, geo.x, geo.y) {
+                if let Ok(reply) = cookie.reply() {
+                    return Some(reply);
+                }
+            }
+        }
+        None
+    };
+
+    let get_coords = |conn: &C,  w| -> (i16, i16) {
+        let tree = get_window_tree(&conn, w).unwrap();
+        let root = tree.root;
+        let translated = translate_coordinates(conn, w, root).unwrap();
+        (translated.dst_x, translated.dst_y)
+    };
+
+    let on_screen =  |c: &C, w: Window, screen: ScreenInfo| -> bool {
+        let (x, y) = get_coords(c, w);
+
+        if screen.x_org <= x && x <= screen.x_org + screen.width as i16 && screen.y_org <= y && y <= screen.y_org + screen.height as i16 {
+            return true
+        }
+
+        false
+    };
+
+    let handle = |conn: &C| -> Option<(i16, i16, u16, u16)> {
+        if  let Some(window ) = get_focused_window(&conn) {
+            let screens = get_screen_info(&conn).unwrap();
+            for info in screens.screen_info {
+                if on_screen(&conn, window, info) {
+                    return Some((info.x_org, info.y_org, info.width, info.height));
+                }
+            }
+        }
+        None
+    };
+
+    // TODO handle pointer position & -m argument
+    handle(conn)
+}
+
 fn create_window<C>(
     conn: &C,
     screen: &x11rb::protocol::xproto::Screen,
@@ -258,6 +340,9 @@ fn create_window<C>(
 where
     C: Connection,
 {
+    // TODO adjust according to detected monitor
+    let monitor = handle_multi_monitor(conn).unwrap();
+    eprintln!("{:?}", monitor);
     let y = match position {
         Position::Top => 0,
         Position::Bottom => screen.height_in_pixels - height
