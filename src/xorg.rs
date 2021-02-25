@@ -332,20 +332,24 @@ fn create_window<C>(
     conn: &C,
     screen: &x11rb::protocol::xproto::Screen,
     atoms: &AtomCollection,
-    (width, height): (u16, u16),
+    height: u16,
     depth: u8,
     visual_id: Visualid,
     position: Position,
-) -> Result<Window, ReplyOrIdError>
+) -> Result<(Window, u16), ReplyOrIdError>
 where
     C: Connection,
 {
-    // TODO adjust according to detected monitor
-    let monitor = handle_multi_monitor(conn).unwrap();
-    eprintln!("{:?}", monitor);
+    let (x, y_offset, w, h) = (|conn: &C, width: u16| {
+        if let Some(screen_pos) = handle_multi_monitor(conn) {
+            return screen_pos;
+        }
+
+        (0, 0, 0, width)
+    })(conn, screen.width_in_pixels);
     let y = match position {
-        Position::Top => 0,
-        Position::Bottom => screen.height_in_pixels - height
+        Position::Top => y_offset,
+        Position::Bottom => y_offset + screen.height_in_pixels as i16 - height as i16
     };
 
     let window = conn.generate_id()?;
@@ -361,9 +365,9 @@ where
         depth,
         window,
         screen.root,
-        0,
-        y as i16,
-        width,
+        x,
+        y,
+        w,
         height,
         0,
         WindowClass::INPUT_OUTPUT,
@@ -403,7 +407,7 @@ where
     )?;
 
     conn.map_window(window)?;
-    Ok(window)
+    Ok((window, w))
 }
 
 fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
@@ -475,7 +479,7 @@ impl XorgUserInterface {
         let (conn, screen_num) = XCBConnection::connect(None)?;
         let screen = &conn.setup().roots[screen_num];
         let atoms = AtomCollection::new(&conn)?.reply()?;
-        let (width, height) = (screen.width_in_pixels, config.height);
+        let height = config.height;
         let (depth, visualid) = choose_visual(&conn, screen_num)?;
 
         // Check if a composite manager is running. In a real application, we should also react to a
@@ -489,7 +493,7 @@ impl XorgUserInterface {
             return Err(Box::from(grab_result.err().unwrap()))
         }
 
-        let window = create_window(&conn, &screen, &atoms, (width, height), depth, visualid, config.position.clone())?;
+        let (window, width) = create_window(&conn, &screen, &atoms, height, depth, visualid, config.position.clone())?;
 
         // Here comes all the interaction between cairo and x11rb:
         let mut visual = find_xcb_visualtype(&conn, visualid).unwrap();
