@@ -17,7 +17,6 @@
  */
 use rgb::{RGB8};
 
-
 #[derive(Debug, Copy, Clone)]
 pub enum Position {
     Top,
@@ -36,6 +35,9 @@ pub struct Config {
     pub font_size: f64,
     pub height: u16,
     pub colors: Colors,
+    pub end_buffer: f64,
+    pub item_spacing: f64,
+    pub start_divisor: f64,
 }
 
 impl Config {
@@ -93,6 +95,9 @@ mod config_feature {
         let position = get_str(&toml, "position");
         let font_size = get_float(&toml, "font_size");
         let height = get_int(&toml, "height");
+        let end_buffer = get_float(&toml, "end_buffer");
+        let item_spacing = get_float(&toml, "item_spacing");
+        let start_divisor = get_float(&toml, "start_divisor");
         let colors = toml.get("colors");
 
         Config {
@@ -103,6 +108,9 @@ mod config_feature {
             },
             font_size: font_size.unwrap_or(DEFAULT_CONFIG.font_size),
             height: height.unwrap_or(DEFAULT_CONFIG.height as i64) as u16,
+            end_buffer: end_buffer.unwrap_or(DEFAULT_CONFIG.end_buffer),
+            item_spacing: item_spacing.unwrap_or(DEFAULT_CONFIG.item_spacing),
+            start_divisor: start_divisor.unwrap_or(DEFAULT_CONFIG.start_divisor),
             colors: handle_colors(colors).unwrap_or(DEFAULT_CONFIG.colors)
         }
     }
@@ -150,14 +158,28 @@ mod config_feature {
 
     fn get_int(toml: &Value, key: &str) -> Option<i64> {
         match toml.get(key) {
-            Some(val) => val.as_integer(),
+            Some(val) => {
+                if val.as_integer().is_none() {
+                    if let Some(float) = get_float(toml, key) {
+                        return Some(float as i64);
+                    }
+                }
+                val.as_integer()
+            },
             None => None
         }
     }
 
     fn get_float(toml: &Value, key: &str) -> Option<f64> {
         match toml.get(key) {
-            Some(val) => val.as_float(),
+            Some(val) => {
+                if val.as_float().is_none() {
+                    if let Some(int) = get_int(toml, key) {
+                        return Some(int as f64);
+                    }
+                }
+                val.as_float()
+            },
             None => None
         }
     }

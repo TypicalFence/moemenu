@@ -600,8 +600,8 @@ impl UserInterface for XorgUserInterface {
 
             // ensure selection does not go of screen
             let items = menu.get_items();
-            let last_item = draw::find_last_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, items);
-            let first_item = draw::find_first_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, items);
+            let last_item = draw::find_last_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, &self.config, items);
+            let first_item = draw::find_first_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, &self.config, items);
             menu.update_page(first_item, last_item);
 
 

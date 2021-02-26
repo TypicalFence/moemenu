@@ -23,13 +23,8 @@ pub fn set_color(cr: &cairo::Context, rgb: RGB8) {
     cr.set_source_rgb(convert(rgb.r), convert(rgb.g), convert(rgb.b));
 }
 
-// TODO put in config
-const END_BUFFER: f64 = 100.0;
-const SPACING: f64 = 50.0;
-const START_DIVISOR: f64 = 6.0;
-
-pub fn find_last_item_that_fits(cr: &cairo::Context, width: f64, start: usize, items: &Vec<String>) -> usize {
-    let mut position: f64 = width / START_DIVISOR;
+pub fn find_last_item_that_fits(cr: &cairo::Context, width: f64, start: usize, config: &Config, items: &Vec<String>) -> usize {
+    let mut position: f64 = width / config.start_divisor;
 
 
     for (i, item) in items.clone().iter().enumerate() {
@@ -43,22 +38,22 @@ pub fn find_last_item_that_fits(cr: &cairo::Context, width: f64, start: usize, i
             Some(word) => cr.text_extents(word).width,
             None => 0.0
         };
-        let next_is_off_screen = position + text_extents.width + next_width + 2.0 * SPACING > width - END_BUFFER;
+        let next_is_off_screen = position + text_extents.width + next_width + 2.0 * config.item_spacing > width - config.end_buffer;
 
         if next_is_off_screen {
             return i;
         }
 
 
-        position += text_extents.width + SPACING;
+        position += text_extents.width + config.item_spacing;
     }
 
     items.len()
 }
 
-pub fn find_first_item_that_fits(cr: &cairo::Context, width: f64, end: usize, items: &Vec<String>) -> usize {
-    let start: f64 = width / START_DIVISOR;
-    let mut position: f64 = width - END_BUFFER;
+pub fn find_first_item_that_fits(cr: &cairo::Context, width: f64, end: usize, config: &Config, items: &Vec<String>) -> usize {
+    let start: f64 = width / config.start_divisor;
+    let mut position: f64 = width - config.end_buffer;
     let len = items.len();
 
     for i in (0..len).rev() {
@@ -73,13 +68,13 @@ pub fn find_first_item_that_fits(cr: &cairo::Context, width: f64, end: usize, it
             Some(word) => cr.text_extents(word).width,
             None => 0.0
         };
-        let prev_is_off_screen = position - text_extents.width - previous_width - 2.0 * SPACING < start;
+        let prev_is_off_screen = position - text_extents.width - previous_width - 2.0 * config.item_spacing < start;
 
         if prev_is_off_screen {
             return i;
         }
 
-        position -= text_extents.width - SPACING;
+        position -= text_extents.width - config.item_spacing;
     }
 
     0
@@ -102,9 +97,9 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
     cr.set_font_size(config.font_size);
     let font_extents = cr.font_extents();
 
-    let start: f64 = width / START_DIVISOR;
+    let start: f64 = width / config.start_divisor;
     let mut position: f64 = start;
-    let spacing = SPACING;
+    let spacing = config.item_spacing;
     let current_selection = menu.get_selection();
 
     // has previous page
@@ -143,7 +138,7 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
             Some(word) => cr.text_extents(word).width,
             None => 0.0
         };
-        let next_is_off_screen = position + text_extents.width + next_width + 2.0 * spacing > width - END_BUFFER;
+        let next_is_off_screen = position + text_extents.width + next_width + 2.0 * spacing > width - config.end_buffer;
 
         let y_pos = height/2.0 + config.font_size/2.0 - font_extents.descent * 0.7; // 0.7 for good measure
         cr.move_to(position, y_pos);
@@ -160,7 +155,7 @@ pub fn do_draw(cr: &cairo::Context, (width, height): (f64, f64), transparency: b
     if has_next_page {
         let next_page_indicator = ">";
         let npi_extents = cr.text_extents(next_page_indicator);
-        cr.move_to(width - END_BUFFER, npi_extents.height + (height - npi_extents.height) / 2.0);
+        cr.move_to(width - config.end_buffer, npi_extents.height + (height - npi_extents.height) / 2.0);
         cr.show_text(next_page_indicator);
     }
 
