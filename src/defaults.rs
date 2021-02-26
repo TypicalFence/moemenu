@@ -26,8 +26,8 @@ pub const DEFAULT_CONFIG: Config = Config {
     position: Position::Top,
     font_size: 13.0,
     height: 26,
-    end_buffer: 50.0,
-    item_spacing: 10.0,
+    end_buffer: 20.0,
+    item_spacing: 20.0,
     start_divisor: 6.0,
     colors: Colors {
         background: PINK,
