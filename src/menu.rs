@@ -39,12 +39,26 @@ impl Menu {
         };
     }
 
-    pub fn search(&mut self, search_term: String) -> &Vec<String> {
+    pub fn search(&mut self, search_term: String) {
         self.selection = 0;
         self.shift = 0;
         self.search_term = search_term;
         self.items = self.engine.search(&self.search_term, &self.input);
-        return &self.items;
+    }
+
+    pub fn input_char(&mut self, c: char) {
+        self.search(format!("{}{}", self.search_term, c));
+    }
+
+    pub fn delete_char(&mut self) {
+        self.search_term.pop();
+        self.search(self.search_term.clone());
+    }
+
+    pub fn complete(&mut self) {
+        if let Some(selection) = self.get_selected_item() {
+            self.search(selection);
+        }
     }
 
     pub fn get_search_term(&self) -> String {

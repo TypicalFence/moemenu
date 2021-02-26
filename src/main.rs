@@ -36,7 +36,7 @@ pub trait SearchEngine {
 }
 
 pub trait UserInterface {
-    fn run(&mut self, menu: &mut Menu) -> Result<String, Box<dyn std::error::Error>>;
+    fn run(&mut self, menu: &mut Menu) -> Result<(String, bool), Box<dyn std::error::Error>>;
 }
 
 fn read_stdin() -> Vec<String> {
@@ -50,18 +50,25 @@ fn read_stdin() -> Vec<String> {
     return input;
 }
 
-fn main() {
-    let config = Config::get();
-    let input= read_stdin();
-    let mut menu = Menu::new(Box::from(ContainsEngine::new()), input);
-    let mut ui = XorgUserInterface::new(config).unwrap();
-    match ui.run(&mut menu) {
-        Ok(selection) => {
+fn run_ui(ui: &mut dyn UserInterface, menu: &mut Menu) {
+    match ui.run( menu) {
+        Ok((selection, should_continue)) => {
             println!("{}", selection);
+            if should_continue {
+                run_ui(ui, menu);
+            }
             exit(0);
         }
         Err(_) => {
             exit(1);
         }
     }
+}
+
+fn main() {
+    let config = Config::get();
+    let input= read_stdin();
+    let mut menu = Menu::new(Box::from(ContainsEngine::new()), input);
+    let mut ui = XorgUserInterface::new(config).unwrap();
+    run_ui(&mut ui, &mut menu);
 }

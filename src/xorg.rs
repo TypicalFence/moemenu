@@ -51,10 +51,12 @@ pub struct XorgUserInterface {
     config: Config
 }
 
+type ShouldContinue = bool;
+
 enum XorgUiAction {
     Redraw,
     Stop,
-    Select,
+    Select(ShouldContinue),
     None,
 }
 
@@ -64,6 +66,7 @@ mod XorgKeys {
 
     pub const ESC: Keycode = 9;
     pub const ENTER: Keycode = 36;
+    pub const TAB: Keycode = 23;
     pub const BACKSPACE: Keycode = 22;
     pub const LEFT: Keycode = 113;
     pub const RIGHT: Keycode = 114;
@@ -335,7 +338,7 @@ C: Connection,
         None
     };
 
-    // TODO handle pointer position & -m argument
+    // TODO handle -m argument
     handle(conn)
 }
 
@@ -423,31 +426,37 @@ where
 }
 
 fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
+    let previous_item = |menu: &mut Menu| {menu.select_previous_item(); XorgUiAction::Redraw};
+    let next_item = |menu: &mut Menu| {menu.select_next_item(); XorgUiAction::Redraw};
+    let delete= |menu: &mut Menu| {menu.delete_char(); XorgUiAction::Redraw};
+    let complete= |menu: &mut Menu| {menu.complete(); XorgUiAction::Redraw};
+
     // response_type 2 => press
     // response_type 3 => release
     match event {
+        // Control is being held
+        KeyPressEvent {
+            response_type: 2,
+            detail,
+            state: 0x4,
+            ..
+        } => match detail {
+            XorgKeys::ENTER => XorgUiAction::Select(true),
+            _ => XorgUiAction::None,
+        },
+        // no modifiers
         KeyPressEvent {
             response_type: 2,
             detail,
             state,
             ..
         } => match detail {
-            XorgKeys::ENTER => XorgUiAction::Select,
+            XorgKeys::ENTER => XorgUiAction::Select(false),
             XorgKeys::ESC => XorgUiAction::Stop,
-            XorgKeys::LEFT => {
-                menu.select_previous_item();
-                XorgUiAction::Redraw
-            },
-            XorgKeys::RIGHT =>  {
-                menu.select_next_item();
-                XorgUiAction::Redraw
-            },
-            XorgKeys::BACKSPACE => {
-                let mut search_term= menu.get_search_term().clone();
-                search_term.pop();
-                menu.search(search_term);
-                XorgUiAction::Redraw
-            },
+            XorgKeys::LEFT => previous_item(menu),
+            XorgKeys::RIGHT =>  next_item(menu),
+            XorgKeys::BACKSPACE => delete(menu),
+            XorgKeys::TAB => complete(menu),
             key => handle_text(menu, key, state),
         },
         _ => {
@@ -457,11 +466,8 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
 }
 
 fn handle_text(menu: &mut Menu, key: Keycode, mask: u16) -> XorgUiAction {
-    let char = sys::keycode_to_char(key, mask);
-
-    if char.is_some() {
-        let search_term = menu.get_search_term();
-        menu.search(format!("{}{}", search_term, char.unwrap()));
+    if let Some(ch) = sys::keycode_to_char(key, mask) {
+        menu.input_char(ch);
         return XorgUiAction::Redraw;
     }
 
@@ -547,7 +553,7 @@ impl XorgUserInterface {
 }
 
 impl UserInterface for XorgUserInterface {
-    fn run(&mut self, menu: &mut Menu) -> Result<String, Box<dyn std::error::Error>> {
+    fn run(&mut self, menu: &mut Menu) -> Result<(String, bool), Box<dyn std::error::Error>> {
         let cr = cairo::Context::new(&self.surface);
         loop {
             self.connection.flush()?;
@@ -574,10 +580,10 @@ impl UserInterface for XorgUserInterface {
                             XorgUiAction::Stop => {
                                 return Err(Box::from(NoSelectionError::new()));
                             }
-                            XorgUiAction::Select => {
+                            XorgUiAction::Select(should_continue) => {
                                 return match menu.get_selected_item() {
-                                    Some(s) => Ok(s),
-                                    None => Ok(menu.get_search_term()) 
+                                    Some(s) => Ok((s, should_continue)),
+                                    None => Ok((menu.get_search_term(), should_continue))
                                 }
                             }
                             XorgUiAction::Redraw => {
