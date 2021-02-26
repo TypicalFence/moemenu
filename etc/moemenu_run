@@ -1,0 +1,3 @@
+#!/bin/sh
+# find all programs in $PATH, run moemenu with the programs as input & run the program via sh
+{ IFS=":"; set -f; find -H $PATH -type f -perm -100 -print; } | sed 's!.*/!!' | sort | uniq | moemenu "@" | ${SHELL:-"/bin/sh"} &
