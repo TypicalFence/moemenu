@@ -6,9 +6,10 @@ edition = "2018"
 license = "GPL-3+"
 
 [features]
-default = ["config"]
+default = ["config", "multimonitor"]
 
 config = ["xdg", "toml", "css-color-parser"]
+multimonitor = ["x11rb/xinerama"]
 
 [build-dependencies]
 cc = "1.0"

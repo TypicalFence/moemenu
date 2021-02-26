@@ -22,7 +22,6 @@ use x11rb::atom_manager;
 use x11rb::connection::Connection;
 use x11rb::errors::{ReplyError, ReplyOrIdError};
 use x11rb::protocol::render::{self, ConnectionExt as _, PictType};
-use x11rb::protocol::xinerama::{self, ConnectionExt as _, *};
 use x11rb::protocol::xproto::{ConnectionExt as _, *};
 use x11rb::protocol::Event;
 use x11rb::wrapper::ConnectionExt;
@@ -31,7 +30,6 @@ use x11rb::xcb_ffi::XCBConnection;
 use crate::{Menu, Config, UserInterface, draw};
 use crate::draw::{do_draw, set_color};
 use crate::config::Position;
-use std::convert::TryInto;
 
 atom_manager! {
     pub AtomCollection: AtomCollectionCookie {
@@ -248,63 +246,62 @@ fn composite_manager_running(
 }
 
 /// returns the position and size of the focused monitor
-fn handle_multi_monitor<C>(conn: &C) -> Option<(i16, i16, u16, u16)> where
-    C: Connection,
+#[cfg(feature = "multimonitor")]
+fn handle_multi_monitor<C>(conn: &C, root: Window) -> Option<(i16, i16, u16, u16)> where
+C: Connection,
 {
-    // TODO streamline
-    let get_screen_info = |conn: &C| -> Option<QueryScreensReply> {
-        if let Ok(cookie) = conn.xinerama_query_screens() {
+    use x11rb::protocol::xinerama::{ConnectionExt as _, *};
+    use x11rb::x11_utils::TryParse;
+    use x11rb::cookie::Cookie;
+    use x11rb::errors::{ConnectionError};
+
+    // hecking generics (maybe define as macro?)
+    fn unwrap_cookie<C, R>(cookie: Result<Cookie<C, R>, ConnectionError>) -> Option<R> where C: Connection, R: TryParse {
+        if let Ok(cookie) = cookie {
             if let Ok(reply) = cookie.reply() {
                 return Some(reply);
             }
         };
         None
     };
+
+    let get_screen_info = |conn: &C| -> Option<QueryScreensReply> {
+        unwrap_cookie(conn.xinerama_query_screens())
+    };
+
     let get_focused_window = |conn: &C| -> Option<Window> {
-        if let Ok(cookie) = conn.get_input_focus() {
-            if let Ok(reply) = cookie.reply() {
-                return Some(reply.focus);
-            }
+        if let Some(reply) = unwrap_cookie(conn.get_input_focus()) {
+            return Some(reply.focus);
         }
         None
     };
+
     let get_geometry= |conn: &C, w| -> Option<GetGeometryReply> {
-        if let Ok(cookie) = conn.get_geometry(w) {
-            if let Ok(reply) = cookie.reply() {
-                return Some(reply);
-            }
-        }
-        None
+        unwrap_cookie(conn.get_geometry(w))
     };
+
     let get_window_tree = |conn: &C, w| {
-        if let Ok(cookie) = conn.query_tree(w) {
-            if let Ok(reply) = cookie.reply() {
-                return Some(reply);
-            }
-        }
-        None
+        unwrap_cookie(conn.query_tree(w))
     };
-    let translate_coordinates = |conn: &C, src, dst| {
+
+    let translate_coordinates = |conn: &C, src, dst| -> Option<TranslateCoordinatesReply> {
         if let Some(geo) = get_geometry(conn, src) {
-            if let Ok(cookie) = conn.translate_coordinates(src, dst, geo.x, geo.y) {
-                if let Ok(reply) = cookie.reply() {
-                    return Some(reply);
-                }
+            return unwrap_cookie(conn.translate_coordinates(src, dst, geo.x, geo.y));
+        }
+        None
+    };
+
+    let get_coords = |conn: &C,  w| -> Option<(i16, i16)> {
+        if let Some(tree) = get_window_tree(&conn, w) {
+            let root = tree.root;
+            if let Some(translated) = translate_coordinates(conn, w, root) {
+                return Some((translated.dst_x, translated.dst_y))
             }
         }
         None
     };
 
-    let get_coords = |conn: &C,  w| -> (i16, i16) {
-        let tree = get_window_tree(&conn, w).unwrap();
-        let root = tree.root;
-        let translated = translate_coordinates(conn, w, root).unwrap();
-        (translated.dst_x, translated.dst_y)
-    };
-
-    let on_screen =  |c: &C, w: Window, screen: ScreenInfo| -> bool {
-        let (x, y) = get_coords(c, w);
-
+    let on_screen =  |x: i16, y: i16, screen: ScreenInfo| -> bool {
         if screen.x_org <= x && x <= screen.x_org + screen.width as i16 && screen.y_org <= y && y <= screen.y_org + screen.height as i16 {
             return true
         }
@@ -313,14 +310,28 @@ fn handle_multi_monitor<C>(conn: &C) -> Option<(i16, i16, u16, u16)> where
     };
 
     let handle = |conn: &C| -> Option<(i16, i16, u16, u16)> {
-        if  let Some(window ) = get_focused_window(&conn) {
-            let screens = get_screen_info(&conn).unwrap();
-            for info in screens.screen_info {
-                if on_screen(&conn, window, info) {
-                    return Some((info.x_org, info.y_org, info.width, info.height));
+        let point: Option<(i16, i16)> =(|| {
+            // try to find focused monitor based on the focused window
+            if let Some(window) = get_focused_window(conn) {
+                return get_coords(conn, window)
+                // try to base it on the pointer location instead
+            } else if let Some(pointer) = unwrap_cookie(conn.query_pointer(root)) {
+                return Some((pointer.root_x, pointer.root_y))
+            }
+
+            None
+        })();
+
+        if let Some((x, y)) = point {
+            if let Some(screens) = get_screen_info(&conn) {
+                for info in screens.screen_info {
+                    if on_screen(x, y, info) {
+                        return Some((info.x_org, info.y_org, info.width, info.height));
+                    }
                 }
             }
         }
+
         None
     };
 
@@ -330,7 +341,7 @@ fn handle_multi_monitor<C>(conn: &C) -> Option<(i16, i16, u16, u16)> where
 
 fn create_window<C>(
     conn: &C,
-    screen: &x11rb::protocol::xproto::Screen,
+    screen: &Screen,
     atoms: &AtomCollection,
     height: u16,
     depth: u8,
@@ -340,16 +351,17 @@ fn create_window<C>(
 where
     C: Connection,
 {
-    let (x, y_offset, w, h) = (|conn: &C, width: u16| {
-        if let Some(screen_pos) = handle_multi_monitor(conn) {
+    let (screen_x, y_offset, screen_w, screen_h) = (|_conn: &C, screen: &Screen| {
+        #[cfg(feature = "multimonitor")]
+        if let Some(screen_pos) = handle_multi_monitor(_conn, screen.root) {
             return screen_pos;
         }
 
-        (0, 0, 0, width)
-    })(conn, screen.width_in_pixels);
-    let y = match position {
+        (0, 0, screen.width_in_pixels, screen.height_in_pixels)
+    })(conn, screen);
+    let screen_y = match position {
         Position::Top => y_offset,
-        Position::Bottom => y_offset + screen.height_in_pixels as i16 - height as i16
+        Position::Bottom => y_offset + screen_h as i16 - height as i16
     };
 
     let window = conn.generate_id()?;
@@ -365,9 +377,9 @@ where
         depth,
         window,
         screen.root,
-        x,
-        y,
-        w,
+        screen_x,
+        screen_y,
+        screen_w,
         height,
         0,
         WindowClass::INPUT_OUTPUT,
@@ -407,7 +419,7 @@ where
     )?;
 
     conn.map_window(window)?;
-    Ok((window, w))
+    Ok((window, screen_w))
 }
 
 fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
