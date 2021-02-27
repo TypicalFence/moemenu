@@ -22,7 +22,7 @@ pub struct ContainsEngine;
 
 impl ContainsEngine {
     pub fn new() -> Self {
-        ContainsEngine{}
+        ContainsEngine {}
     }
 }
 

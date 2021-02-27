@@ -15,12 +15,12 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-use rgb::{RGB8};
+use rgb::RGB8;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Position {
     Top,
-    Bottom
+    Bottom,
 }
 
 pub struct Colors {
@@ -56,14 +56,14 @@ impl Config {
 mod config_feature {
     use std::fs;
 
-    use xdg::BaseDirectories;
-    use toml::Value;
     use css_color_parser::Color as CssColor;
+    use rgb::RGB8;
     use toml::value::Table;
-    use rgb::{RGB8};
+    use toml::Value;
+    use xdg::BaseDirectories;
 
-    use crate::defaults::{DEFAULT_CONFIG};
-    use super::{Config, Colors, Position};
+    use super::{Colors, Config, Position};
+    use crate::defaults::DEFAULT_CONFIG;
 
     pub fn load() -> Config {
         let xdg = BaseDirectories::new();
@@ -76,7 +76,7 @@ mod config_feature {
             return DEFAULT_CONFIG;
         }
 
-        let result= fs::read_to_string(file.unwrap());
+        let result = fs::read_to_string(file.unwrap());
         if result.is_err() {
             return DEFAULT_CONFIG;
         }
@@ -87,7 +87,7 @@ mod config_feature {
 
         match values {
             Ok(values) => handle_toml(values),
-            Err(_) => DEFAULT_CONFIG
+            Err(_) => DEFAULT_CONFIG,
         }
     }
 
@@ -104,14 +104,14 @@ mod config_feature {
             position: match position.unwrap_or("top".to_string()).as_str() {
                 "top" => Position::Top,
                 "bottom" => Position::Bottom,
-                _ => Position::Bottom
+                _ => Position::Bottom,
             },
             font_size: font_size.unwrap_or(DEFAULT_CONFIG.font_size),
             height: height.unwrap_or(DEFAULT_CONFIG.height as i64) as u16,
             end_buffer: end_buffer.unwrap_or(DEFAULT_CONFIG.end_buffer),
             item_spacing: item_spacing.unwrap_or(DEFAULT_CONFIG.item_spacing),
             start_divisor: start_divisor.unwrap_or(DEFAULT_CONFIG.start_divisor),
-            colors: handle_colors(colors).unwrap_or(DEFAULT_CONFIG.colors)
+            colors: handle_colors(colors).unwrap_or(DEFAULT_CONFIG.colors),
         }
     }
 
@@ -122,7 +122,7 @@ mod config_feature {
 
         let colors = toml.unwrap().as_table().unwrap();
         let background = get_color_str(&colors, "background");
-        let font= get_color_str(colors, "font");
+        let font = get_color_str(colors, "font");
         let selected_background = get_color_str(colors, "selected_background");
         let selected_font = get_color_str(colors, "selected_font");
 
@@ -130,7 +130,10 @@ mod config_feature {
             background: parse_color(background, DEFAULT_CONFIG.colors.background),
             font: parse_color(font, DEFAULT_CONFIG.colors.font),
             selected_font: parse_color(selected_font, DEFAULT_CONFIG.colors.selected_font),
-            selected_background: parse_color(selected_background, DEFAULT_CONFIG.colors.selected_background)
+            selected_background: parse_color(
+                selected_background,
+                DEFAULT_CONFIG.colors.selected_background,
+            ),
         })
     }
 
@@ -142,7 +145,7 @@ mod config_feature {
         let color = maybe.unwrap().parse::<CssColor>();
         match color {
             Ok(c) => RGB8::new(c.r, c.g, c.b),
-            Err(_) => fallback
+            Err(_) => fallback,
         }
     }
 
@@ -152,7 +155,7 @@ mod config_feature {
                 Some(s) => Some(s.to_string()),
                 None => None,
             },
-            None => None
+            None => None,
         }
     }
 
@@ -165,8 +168,8 @@ mod config_feature {
                     }
                 }
                 val.as_integer()
-            },
-            None => None
+            }
+            None => None,
         }
     }
 
@@ -179,8 +182,8 @@ mod config_feature {
                     }
                 }
                 val.as_float()
-            },
-            None => None
+            }
+            None => None,
         }
     }
 
@@ -190,9 +193,7 @@ mod config_feature {
                 Some(s) => Some(s.to_string()),
                 None => None,
             },
-            None => None
+            None => None,
         }
     }
 }
-
-

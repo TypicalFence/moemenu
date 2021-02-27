@@ -15,8 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+use crate::config::{Colors, Config, Position};
 use rgb::RGB8;
-use crate::config::{Config, Colors, Position};
 
 const PINK: RGB8 = RGB8::new(247, 168, 184);
 const BLACK: RGB8 = RGB8::new(0, 0, 0);
@@ -34,5 +34,5 @@ pub const DEFAULT_CONFIG: Config = Config {
         font: BLACK,
         selected_font: BLACK,
         selected_background: WHITE,
-    }
+    },
 };

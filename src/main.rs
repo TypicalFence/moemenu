@@ -15,21 +15,21 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+mod config;
+mod defaults;
 mod draw;
 mod menu;
 mod search;
 mod xorg;
-mod config;
-mod defaults;
 
 use std::io;
-use std::io::{BufRead};
+use std::io::BufRead;
 use std::process::exit;
 
-pub use crate::menu::Menu;
 pub use crate::config::Config;
-use crate::xorg::XorgUserInterface;
+pub use crate::menu::Menu;
 use crate::search::ContainsEngine;
+use crate::xorg::XorgUserInterface;
 
 pub trait SearchEngine {
     fn search(&mut self, needle: &String, haystack: &Vec<String>) -> Vec<String>;
@@ -51,7 +51,7 @@ fn read_stdin() -> Vec<String> {
 }
 
 fn run_ui(ui: &mut dyn UserInterface, menu: &mut Menu) {
-    match ui.run( menu) {
+    match ui.run(menu) {
         Ok((selection, should_continue)) => {
             println!("{}", selection);
             if should_continue {
@@ -67,7 +67,7 @@ fn run_ui(ui: &mut dyn UserInterface, menu: &mut Menu) {
 
 fn main() {
     let config = Config::get();
-    let input= read_stdin();
+    let input = read_stdin();
     let mut menu = Menu::new(Box::from(ContainsEngine::new()), input);
     let mut ui = XorgUserInterface::new(config).unwrap();
     run_ui(&mut ui, &mut menu);

@@ -35,7 +35,7 @@ impl Menu {
             items: input.clone(),
             selection: 0,
             shift: 0,
-            engine
+            engine,
         };
     }
 
@@ -88,7 +88,7 @@ impl Menu {
     pub fn get_selected_item(&self) -> Option<String> {
         match self.items.get(self.selection as usize) {
             Some(s) => Some(s.clone()),
-            None => None
+            None => None,
         }
     }
 
@@ -111,4 +111,3 @@ impl Menu {
         false
     }
 }
-

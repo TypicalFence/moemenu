@@ -27,9 +27,9 @@ use x11rb::protocol::Event;
 use x11rb::wrapper::ConnectionExt;
 use x11rb::xcb_ffi::XCBConnection;
 
-use crate::{Menu, Config, UserInterface, draw};
-use crate::draw::{do_draw, set_color};
 use crate::config::Position;
+use crate::draw::{do_draw, set_color};
+use crate::{draw, Config, Menu, UserInterface};
 
 atom_manager! {
     pub AtomCollection: AtomCollectionCookie {
@@ -48,7 +48,7 @@ pub struct XorgUserInterface {
     window: Window,
     atoms: AtomCollection,
     surface: cairo::XCBSurface,
-    config: Config
+    config: Config,
 }
 
 type ShouldContinue = bool;
@@ -126,8 +126,7 @@ impl Error for KeyboardGrabError {
 }
 
 #[derive(Debug)]
-struct NoSelectionError {
-}
+struct NoSelectionError {}
 
 impl NoSelectionError {
     fn new() -> Self {
@@ -135,7 +134,7 @@ impl NoSelectionError {
     }
 }
 
-impl fmt::Display for NoSelectionError{
+impl fmt::Display for NoSelectionError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "No selection as made.")
     }
@@ -152,7 +151,7 @@ impl Error for NoSelectionError {
 mod sys {
     use std::os::raw::c_char;
     use x11rb::protocol::xproto::Keycode;
-    
+
     //const XBufferOverflow: i8 = -1;
     //const XLookupNone: i8 = 1;
     const XLookupChars: i32 = 2;
@@ -165,22 +164,20 @@ mod sys {
 
     pub fn keycode_to_char(keycode: Keycode, state: u16) -> Option<char> {
         let mut buffer: [c_char; 32] = [0; 32];
-        let status: i32 = unsafe {
-            keycode_to_utf8(keycode as u32, state as u32, buffer.as_mut_ptr())
-        };
-        
+        let status: i32 =
+            unsafe { keycode_to_utf8(keycode as u32, state as u32, buffer.as_mut_ptr()) };
+
         // if we received bytes try converting them into a char
         if status == XLookupChars || status == XLookupBoth {
             // why does rust define c_char as i8 ???
             let proper_bytes: Vec<u8> = buffer.to_vec().iter().map(|x| x.clone() as u8).collect();
             let str = std::str::from_utf8(proper_bytes.as_slice()).unwrap();
             let trimmed = str.trim_matches(char::from(0));
-            return trimmed.chars().next()
+            return trimmed.chars().next();
         }
-        
+
         None
     }
-
 }
 
 /// Find a `xcb_visualtype_t` based on its ID number
@@ -250,16 +247,21 @@ fn composite_manager_running(
 
 /// returns the position and size of the focused monitor
 #[cfg(feature = "multimonitor")]
-fn handle_multi_monitor<C>(conn: &C, root: Window) -> Option<(i16, i16, u16, u16)> where
-C: Connection,
+fn handle_multi_monitor<C>(conn: &C, root: Window) -> Option<(i16, i16, u16, u16)>
+where
+    C: Connection,
 {
+    use x11rb::cookie::Cookie;
+    use x11rb::errors::ConnectionError;
     use x11rb::protocol::xinerama::{ConnectionExt as _, *};
     use x11rb::x11_utils::TryParse;
-    use x11rb::cookie::Cookie;
-    use x11rb::errors::{ConnectionError};
 
     // hecking generics (maybe define as macro?)
-    fn unwrap_cookie<C, R>(cookie: Result<Cookie<C, R>, ConnectionError>) -> Option<R> where C: Connection, R: TryParse {
+    fn unwrap_cookie<C, R>(cookie: Result<Cookie<C, R>, ConnectionError>) -> Option<R>
+    where
+        C: Connection,
+        R: TryParse,
+    {
         if let Ok(cookie) = cookie {
             if let Ok(reply) = cookie.reply() {
                 return Some(reply);
@@ -268,9 +270,8 @@ C: Connection,
         None
     };
 
-    let get_screen_info = |conn: &C| -> Option<QueryScreensReply> {
-        unwrap_cookie(conn.xinerama_query_screens())
-    };
+    let get_screen_info =
+        |conn: &C| -> Option<QueryScreensReply> { unwrap_cookie(conn.xinerama_query_screens()) };
 
     let get_focused_window = |conn: &C| -> Option<Window> {
         if let Some(reply) = unwrap_cookie(conn.get_input_focus()) {
@@ -281,13 +282,10 @@ C: Connection,
         None
     };
 
-    let get_geometry= |conn: &C, w| -> Option<GetGeometryReply> {
-        unwrap_cookie(conn.get_geometry(w))
-    };
+    let get_geometry =
+        |conn: &C, w| -> Option<GetGeometryReply> { unwrap_cookie(conn.get_geometry(w)) };
 
-    let get_window_tree = |conn: &C, w| {
-        unwrap_cookie(conn.query_tree(w))
-    };
+    let get_window_tree = |conn: &C, w| unwrap_cookie(conn.query_tree(w));
 
     let translate_coordinates = |conn: &C, src, dst| -> Option<TranslateCoordinatesReply> {
         if let Some(geo) = get_geometry(conn, src) {
@@ -296,29 +294,32 @@ C: Connection,
         None
     };
 
-    let get_coords = |conn: &C,  w| -> Option<(i16, i16)> {
+    let get_coords = |conn: &C, w| -> Option<(i16, i16)> {
         if let Some(tree) = get_window_tree(&conn, w) {
             let root = tree.root;
             if let Some(translated) = translate_coordinates(conn, w, root) {
-                return Some((translated.dst_x, translated.dst_y))
+                return Some((translated.dst_x, translated.dst_y));
             }
         }
         None
     };
 
-    let on_screen =  |x: i16, y: i16, screen: ScreenInfo| -> bool {
-        if screen.x_org <= x && x <= screen.x_org + screen.width as i16 && screen.y_org <= y && y <= screen.y_org + screen.height as i16 {
-            return true
+    let on_screen = |x: i16, y: i16, screen: ScreenInfo| -> bool {
+        if screen.x_org <= x
+            && x <= screen.x_org + screen.width as i16
+            && screen.y_org <= y
+            && y <= screen.y_org + screen.height as i16
+        {
+            return true;
         }
 
         false
     };
 
     let handle = |conn: &C| -> Option<(i16, i16, u16, u16)> {
-        let point: Option<(i16, i16)> =(|| {
+        let point: Option<(i16, i16)> = (|| {
             // try to find focused monitor based on the focused window
             if let Some(window) = get_focused_window(conn) {
-
                 if let Some((x, y)) = get_coords(conn, window) {
                     if x > -1 && y > -1 {
                         return Some((x, y));
@@ -327,13 +328,13 @@ C: Connection,
 
                 // try to base it on the pointer location instead
                 if let Some(pointer) = unwrap_cookie(conn.query_pointer(root)) {
-                    return Some((pointer.root_x, pointer.root_y))
+                    return Some((pointer.root_x, pointer.root_y));
                 }
             }
 
             None
         })();
-        
+
         if let Some((x, y)) = point {
             if let Some(screens) = get_screen_info(&conn) {
                 for info in screens.screen_info {
@@ -373,7 +374,7 @@ where
     })(conn, screen);
     let screen_y = match position {
         Position::Top => y_offset,
-        Position::Bottom => y_offset + screen_h as i16 - height as i16
+        Position::Bottom => y_offset + screen_h as i16 - height as i16,
     };
 
     let window = conn.generate_id()?;
@@ -435,10 +436,22 @@ where
 }
 
 fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
-    let previous_item = |menu: &mut Menu| {menu.select_previous_item(); XorgUiAction::Redraw};
-    let next_item = |menu: &mut Menu| {menu.select_next_item(); XorgUiAction::Redraw};
-    let delete= |menu: &mut Menu| {menu.delete_char(); XorgUiAction::Redraw};
-    let complete= |menu: &mut Menu| {menu.complete(); XorgUiAction::Redraw};
+    let previous_item = |menu: &mut Menu| {
+        menu.select_previous_item();
+        XorgUiAction::Redraw
+    };
+    let next_item = |menu: &mut Menu| {
+        menu.select_next_item();
+        XorgUiAction::Redraw
+    };
+    let delete = |menu: &mut Menu| {
+        menu.delete_char();
+        XorgUiAction::Redraw
+    };
+    let complete = |menu: &mut Menu| {
+        menu.complete();
+        XorgUiAction::Redraw
+    };
 
     // response_type 2 => press
     // response_type 3 => release
@@ -463,7 +476,7 @@ fn handle_keyboard(event: KeyPressEvent, menu: &mut Menu) -> XorgUiAction {
             XorgKeys::ENTER => XorgUiAction::Select(false),
             XorgKeys::ESC => XorgUiAction::Stop,
             XorgKeys::LEFT => previous_item(menu),
-            XorgKeys::RIGHT =>  next_item(menu),
+            XorgKeys::RIGHT => next_item(menu),
             XorgKeys::BACKSPACE => delete(menu),
             XorgKeys::TAB => complete(menu),
             key => handle_text(menu, key, state),
@@ -494,7 +507,7 @@ fn grab_keyboard(conn: &XCBConnection, screen: &Screen) -> Result<(), KeyboardGr
         if cookie.reply().unwrap().status == GrabStatus::SUCCESS {
             return Ok(());
         }
-        
+
         thread::sleep(wait_time);
     }
 
@@ -517,10 +530,18 @@ impl XorgUserInterface {
         let grab_result = grab_keyboard(&conn, &screen);
 
         if grab_result.is_err() {
-            return Err(Box::from(grab_result.err().unwrap()))
+            return Err(Box::from(grab_result.err().unwrap()));
         }
 
-        let (window, width) = create_window(&conn, &screen, &atoms, height, depth, visualid, config.position.clone())?;
+        let (window, width) = create_window(
+            &conn,
+            &screen,
+            &atoms,
+            height,
+            depth,
+            visualid,
+            config.position.clone(),
+        )?;
 
         // Here comes all the interaction between cairo and x11rb:
         let mut visual = find_xcb_visualtype(&conn, visualid).unwrap();
@@ -592,7 +613,7 @@ impl UserInterface for XorgUserInterface {
                             XorgUiAction::Select(should_continue) => {
                                 return match menu.get_selected_item() {
                                     Some(s) => Ok((s, should_continue)),
-                                    None => Ok((menu.get_search_term(), should_continue))
+                                    None => Ok((menu.get_search_term(), should_continue)),
                                 }
                             }
                             XorgUiAction::Redraw => {
@@ -609,10 +630,21 @@ impl UserInterface for XorgUserInterface {
 
             // ensure selection does not go of screen
             let items = menu.get_items();
-            let last_item = draw::find_last_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, &self.config, items);
-            let first_item = draw::find_first_item_that_fits(&cr, self.width as f64, menu.get_shift() as usize, &self.config, items);
+            let last_item = draw::find_last_item_that_fits(
+                &cr,
+                self.width as f64,
+                menu.get_shift() as usize,
+                &self.config,
+                items,
+            );
+            let first_item = draw::find_first_item_that_fits(
+                &cr,
+                self.width as f64,
+                menu.get_shift() as usize,
+                &self.config,
+                items,
+            );
             menu.update_page(first_item, last_item);
-
 
             if need_redraw {
                 do_draw(
