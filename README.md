@@ -8,6 +8,7 @@ It aims to be simple, small, userfriendly and portable.
 - libxcb 
 - cairo
 - a C compiler 
+- current rustc stable 
 
 ## Building
 
