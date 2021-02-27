@@ -237,7 +237,7 @@ fn choose_visual(conn: &impl Connection, screen_num: usize) -> Result<(u8, Visua
     Ok((screen.root_depth, screen.root_visual))
 }
 
-/// Check if a composite manager is running
+/// Check if a composite manager is runninwd
 fn composite_manager_running(
     conn: &impl Connection,
     screen_num: usize,
@@ -274,6 +274,8 @@ C: Connection,
 
     let get_focused_window = |conn: &C| -> Option<Window> {
         if let Some(reply) = unwrap_cookie(conn.get_input_focus()) {
+            // this will always return a focused window
+            // should find a way to check if the focus is an actual window or not
             return Some(reply.focus);
         }
         None
@@ -316,15 +318,22 @@ C: Connection,
         let point: Option<(i16, i16)> =(|| {
             // try to find focused monitor based on the focused window
             if let Some(window) = get_focused_window(conn) {
-                return get_coords(conn, window)
+
+                if let Some((x, y)) = get_coords(conn, window) {
+                    if x > -1 && y > -1 {
+                        return Some((x, y));
+                    }
+                }
+
                 // try to base it on the pointer location instead
-            } else if let Some(pointer) = unwrap_cookie(conn.query_pointer(root)) {
-                return Some((pointer.root_x, pointer.root_y))
+                if let Some(pointer) = unwrap_cookie(conn.query_pointer(root)) {
+                    return Some((pointer.root_x, pointer.root_y))
+                }
             }
 
             None
         })();
-
+        
         if let Some((x, y)) = point {
             if let Some(screens) = get_screen_info(&conn) {
                 for info in screens.screen_info {
